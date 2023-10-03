@@ -4,10 +4,13 @@ from segment_anything import SamAutomaticMaskGenerator, sam_model_registry, SamP
 import cv2  # Image processing
 import numpy as np  # Numeric data
 import pandas as pd  # Tabular data
+import matplotlib.pyplot as plt # Plotting
+plt.rcParams['figure.figsize'] = [10, 10]
 from rasterio.features import shapes  # Vectorising rasters to polygons
 from shapely import Point, LineString, Polygon  # Geometry
 from shapely.geometry import box, shape
 from shapely.ops import nearest_points
+from shapely import centroid
 import geopandas as gpd  # Plotting polygons
 from tqdm.auto import tqdm  # Progress bars
 import time
@@ -130,8 +133,11 @@ def get_diameter(poly):
     line = LineString(result_coords)
     return line
 
+def annotate_length(row):
+    x, y = centroid(row.geometry).coords[0]
+    plt.text(s=f"{row.length_cm:.2f}cm", x=x, y=y, ha='center', va='center', bbox=dict(boxstyle="round", alpha=.6), fontsize="x-small")
 
-def measure_mussels_in_image(sam, filepath):
+def measure_mussels_in_image(sam, filepath, plot=False):
     img = load_img(filepath)
     img = rectify(sam, img)
     df = get_shapes(sam, img)
@@ -140,10 +146,22 @@ def measure_mussels_in_image(sam, filepath):
     df = filter_to_tray(df)
     df["diameter_line"] = df.geometry.apply(get_diameter)
     df["length_cm"] = df.diameter_line.length / px_per_cm
+    if plot:
+        plt.imshow(img)
+        ax = plt.gca()
+        ruler.diameter_line = get_diameter(ruler.geometry)
+        ruler.length_cm = ruler.diameter_line.length / px_per_cm
+        gpd.GeoSeries(ruler.diameter_line).plot(color="cyan", ax=ax)
+        annotate_length(ruler)
+        df.diameter_line.plot(color="cyan", ax=ax)
+        for i, row in df.iterrows():
+            annotate_length(row)
+        plt.tight_layout()
+        plt.savefig(filepath.replace(".png", "_measured.png"))
     return df.length_cm.describe()
 
 if __name__ == "__main__":
     start = time.time()
     sam = load_SAM()
     print(f"{round(time.time() - start)}s: SAM loaded")
-    print(measure_mussels_in_image(sam, "test.png"))
+    print(measure_mussels_in_image(sam, "test.png", plot=True))
