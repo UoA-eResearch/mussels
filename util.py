@@ -4,8 +4,9 @@ from segment_anything import SamAutomaticMaskGenerator, sam_model_registry, SamP
 import cv2  # Image processing
 import numpy as np  # Numeric data
 import pandas as pd  # Tabular data
-import matplotlib.pyplot as plt # Plotting
-plt.rcParams['figure.figsize'] = [10, 10]
+import matplotlib.pyplot as plt  # Plotting
+
+plt.rcParams["figure.figsize"] = [10, 10]
 from rasterio.features import shapes  # Vectorising rasters to polygons
 from shapely import Point, LineString, Polygon  # Geometry
 from shapely.geometry import box, shape
@@ -14,6 +15,7 @@ from shapely import centroid
 import geopandas as gpd  # Plotting polygons
 from tqdm.auto import tqdm  # Progress bars
 import time
+from glob import glob
 
 tqdm.pandas()
 
@@ -103,17 +105,25 @@ def get_shapes(sam, img):
     df = df.sort_values(by="area", ascending=False)
     return df
 
+def get_dimensions(geom):
+    x1, y1, x2, y2 = geom.bounds
+    width = x2 - x1
+    height = y2 - y1
+    return width, height
+
 
 def filter_to_tray(df):
     tray = df.iloc[0]
-    return df[df.within(tray.geometry.envelope.buffer(-5)) & (df.area > 550)]
+    width, height = get_dimensions(tray.geometry)
+    tray_edge_buffer = height * .03
+    area_threshold = height * .5
+    return df[df.within(tray.geometry.envelope.buffer(-tray_edge_buffer)) & (df.area > area_threshold)]
 
 
 def get_px_per_cm(ruler):
-    x1, y1, x2, y2 = ruler.geometry.bounds
-    ruler_height = y2 - y1
+    width, height = get_dimensions(ruler.geometry)
     # pixels to cm conversion. ruler is 32cm long
-    px_per_cm = ruler_height / 32
+    px_per_cm = height / 32
     return px_per_cm
 
 
@@ -133,20 +143,42 @@ def get_diameter(poly):
     line = LineString(result_coords)
     return line
 
+
+# The ruler will be one of the top largest objects by area, and it's aspect ratio will be low (width much less than height)
+def find_ruler(df):
+    for i, row in df.iterrows():
+        width, height = get_dimensions(row.geometry)
+        ratio = width / height
+        if ratio < 0.15:
+            return row
+
+
 def annotate_length(row):
     x, y = centroid(row.geometry).coords[0]
-    plt.text(s=f"{row.length_cm:.2f}cm", x=x, y=y, ha='center', va='center', bbox=dict(boxstyle="round", alpha=.6), fontsize="x-small")
+    plt.text(
+        s=f"{row.length_cm:.2f}cm",
+        x=x,
+        y=y,
+        ha="center",
+        va="center",
+        bbox=dict(boxstyle="round", alpha=0.6),
+        fontsize="x-small",
+    )
+
 
 def measure_mussels_in_image(sam, filepath, plot=False):
     img = load_img(filepath)
     img = rectify(sam, img)
     df = get_shapes(sam, img)
-    ruler = df.iloc[2]
+    ruler = find_ruler(df)
     px_per_cm = get_px_per_cm(ruler)
     df = filter_to_tray(df)
     df["diameter_line"] = df.geometry.apply(get_diameter)
     df["length_cm"] = df.diameter_line.length / px_per_cm
+    # Discard results longer than 5cm, probably misdetections
+    df = df[df["length_cm"] < 5]
     if plot:
+        plt.figure()
         plt.imshow(img)
         ax = plt.gca()
         ruler.diameter_line = get_diameter(ruler.geometry)
@@ -160,8 +192,15 @@ def measure_mussels_in_image(sam, filepath, plot=False):
         plt.savefig(filepath.replace(".png", "_measured.png"))
     return df.length_cm.describe()
 
+
 if __name__ == "__main__":
     start = time.time()
     sam = load_SAM()
     print(f"{round(time.time() - start)}s: SAM loaded")
-    print(measure_mussels_in_image(sam, "test.png", plot=True))
+    files = glob("*.png")
+    files = ["test.png", "test2.png"]
+    for f in tqdm(files):
+        print(f)
+        print(measure_mussels_in_image(sam, f, plot=True))
+        print(f"{round(time.time() - start)}s: {f} done")
+    print(f"{round(time.time() - start)}s: done")
