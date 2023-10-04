@@ -189,7 +189,7 @@ def measure_mussels_in_image(sam, filepath, plot=False):
         for i, row in df.iterrows():
             annotate_length(row)
         plt.tight_layout()
-        plt.savefig(filepath.replace(".png", "_measured.png"))
+        plt.savefig(filepath + "_measured.png")
     return df.length_cm.describe()
 
 
@@ -197,10 +197,14 @@ if __name__ == "__main__":
     start = time.time()
     sam = load_SAM()
     print(f"{round(time.time() - start)}s: SAM loaded")
-    files = glob("*.png")
-    files = ["test.png", "test2.png"]
+    files = sorted(glob("EX4_*/**/*.JPEG", recursive=True))
+    results = []
     for f in tqdm(files):
         print(f)
-        print(measure_mussels_in_image(sam, f, plot=True))
+        result = measure_mussels_in_image(sam, f, plot=True)
+        print(result)
+        result["filename"] = f
+        results.append(result)
+        pd.DataFrame(results).to_csv("results.csv")
         print(f"{round(time.time() - start)}s: {f} done")
     print(f"{round(time.time() - start)}s: done")
