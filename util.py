@@ -16,6 +16,7 @@ import geopandas as gpd  # Plotting polygons
 from tqdm.auto import tqdm  # Progress bars
 import time
 from glob import glob
+import os
 
 tqdm.pandas()
 
@@ -108,14 +109,6 @@ def get_dimensions(geom):
     return width, height
 
 
-def filter_to_tray(df):
-    tray = df.iloc[0]
-    width, height = get_dimensions(tray.geometry)
-    tray_edge_buffer = height * .03
-    area_threshold = height * .5
-    return df[df.within(tray.geometry.envelope.buffer(-tray_edge_buffer)) & (df.area > area_threshold)]
-
-
 def get_px_per_cm(ruler):
     width, height = get_dimensions(ruler.geometry)
     # pixels to cm conversion. ruler is 32cm long
@@ -168,9 +161,18 @@ def measure_mussels_in_image(sam, filepath, plot=False):
     df = get_shapes(sam, img)
     ruler = find_ruler(df)
     px_per_cm = get_px_per_cm(ruler)
-    df = filter_to_tray(df)
+
+    # Filter to inner part of tray
+    tray = df.iloc[0]
+    width, height = get_dimensions(tray.geometry)
+    tray_edge_buffer = height * .03
+    area_threshold = height * .5
+    tray_inner = tray.geometry.convex_hull.buffer(-tray_edge_buffer)
+    df = df[df.within(tray_inner) & (df.area > area_threshold)]
+
     df["diameter_line"] = df.geometry.apply(get_diameter)
     df["length_cm"] = df.diameter_line.length / px_per_cm
+    df["area_cm"] = df.area / px_per_cm ** 2
     # Discard results longer than 5cm, probably misdetections
     df = df[df["length_cm"] < 5]
     if plot:
@@ -179,14 +181,15 @@ def measure_mussels_in_image(sam, filepath, plot=False):
         ax = plt.gca()
         ruler.diameter_line = get_diameter(ruler.geometry)
         ruler.length_cm = ruler.diameter_line.length / px_per_cm
-        gpd.GeoSeries(ruler.diameter_line).plot(color="cyan", ax=ax)
+        gpd.GeoSeries([tray.geometry.convex_hull.exterior, tray_inner.exterior, ruler.geometry.exterior, ruler.diameter_line]).plot(color="cyan", ax=ax)
         annotate_length(ruler)
         df.diameter_line.plot(color="cyan", ax=ax)
         for i, row in df.iterrows():
             annotate_length(row)
         plt.tight_layout()
-        plt.savefig(filepath + "_measured.png")
-    return df.length_cm.describe()
+        os.makedirs("results/" + os.path.dirname(filepath), exist_ok=True)
+        plt.savefig("results/" + filepath + "_measured.png")
+    return df
 
 
 if __name__ == "__main__":
@@ -195,12 +198,16 @@ if __name__ == "__main__":
     print(f"{round(time.time() - start)}s: SAM loaded")
     files = sorted(glob("EX4_*/**/*.JPEG", recursive=True))
     results = []
+    # 259/259 [5:09:14<00:00, 71.64s/it]
     for f in tqdm(files):
         print(f)
-        result = measure_mussels_in_image(sam, f, plot=True)
-        print(result)
-        result["filename"] = f
-        results.append(result)
-        pd.DataFrame(results).to_csv("results.csv")
+        df = measure_mussels_in_image(sam, f, plot=True)
+        os.makedirs("results/" + os.path.dirname(f), exist_ok=True)
+        df.to_csv("results/" + f + ".csv")
+        stats = df.describe()
+        print(stats)
+        stats["filename"] = f
+        results.append(stats)
+        pd.DataFrame(stats).to_csv("results.csv")
         print(f"{round(time.time() - start)}s: {f} done")
     print(f"{round(time.time() - start)}s: done")
