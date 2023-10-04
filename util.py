@@ -208,6 +208,6 @@ if __name__ == "__main__":
         print(stats)
         stats["filename"] = f
         results.append(stats)
-        pd.DataFrame(stats).to_csv("results.csv")
+        pd.DataFrame(results).to_csv("results.csv")
         print(f"{round(time.time() - start)}s: {f} done")
     print(f"{round(time.time() - start)}s: done")
