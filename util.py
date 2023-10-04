@@ -57,11 +57,7 @@ def rectify(sam, img):
     ).generate(img)
     tray = max(masks, key=lambda x: x["area"])
     # Convert binary mask to polygon
-    tray = shape(
-        next(shapes(tray["segmentation"].astype(np.uint8), mask=tray["segmentation"]))[
-            0
-        ]
-    )
+    tray = gpd.GeoSeries(shape(s) for s, v in shapes(tray["segmentation"].astype(np.uint8), mask=tray["segmentation"])).unary_union
     trapezoid = snap(tray.envelope.exterior, tray)
     bounds = trapezoid.envelope.exterior
     source_corners = np.float32(trapezoid.coords[:4])
