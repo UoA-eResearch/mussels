@@ -5,3 +5,5 @@ matplotlib
 opencv-python
 git+https://github.com/facebookresearch/segment-anything.git
 jupyter-autotime
+rasterio
+tqdm
