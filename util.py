@@ -104,9 +104,8 @@ def get_shapes(sam, img):
 
 def get_dimensions(geom):
     x1, y1, x2, y2 = geom.bounds
-    width = x2 - x1
-    height = y2 - y1
-    return width, height
+    dims = [x2 - x1, y2 - y1]
+    return min(dims), max(dims)
 
 
 def get_px_per_cm(ruler, ruler_length=32):
@@ -196,6 +195,7 @@ if __name__ == "__main__":
     start = time.time()
     sam = load_SAM()
     print(f"{round(time.time() - start)}s: SAM loaded")
+    #df = measure_mussels_in_image(sam, "test.png", plot=True, ruler_length=31.797)
     results = []
     for folder in ["EX4_ID", "EX4_S1"]:
         files = sorted(glob(f"{folder}/**/*.JPEG", recursive=True))
