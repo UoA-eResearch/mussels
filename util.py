@@ -109,10 +109,10 @@ def get_dimensions(geom):
     return width, height
 
 
-def get_px_per_cm(ruler):
+def get_px_per_cm(ruler, ruler_length=32):
     width, height = get_dimensions(ruler.geometry)
     # pixels to cm conversion. ruler is 32cm long
-    px_per_cm = height / 32
+    px_per_cm = height / ruler_length
     return px_per_cm
 
 
@@ -155,12 +155,12 @@ def annotate_length(row):
     )
 
 
-def measure_mussels_in_image(sam, filepath, plot=False):
+def measure_mussels_in_image(sam, filepath, plot=False, ruler_length=32):
     img = load_img(filepath)
     img = rectify(sam, img)
     df = get_shapes(sam, img)
     ruler = find_ruler(df)
-    px_per_cm = get_px_per_cm(ruler)
+    px_per_cm = get_px_per_cm(ruler, ruler_length)
 
     # Filter to inner part of tray
     tray = df.iloc[0]
@@ -196,18 +196,23 @@ if __name__ == "__main__":
     start = time.time()
     sam = load_SAM()
     print(f"{round(time.time() - start)}s: SAM loaded")
-    files = sorted(glob("EX4_*/**/*.JPEG", recursive=True))
     results = []
-    # 259/259 [5:09:14<00:00, 71.64s/it]
-    for f in tqdm(files):
-        print(f)
-        df = measure_mussels_in_image(sam, f, plot=True)
-        os.makedirs("results/" + os.path.dirname(f), exist_ok=True)
-        df.to_csv("results/" + f + ".csv")
-        stats = df.length_cm.describe()
-        print(stats)
-        stats["filename"] = f
-        results.append(stats)
-        pd.DataFrame(results).to_csv("results.csv")
-        print(f"{round(time.time() - start)}s: {f} done")
-    print(f"{round(time.time() - start)}s: done")
+    for folder in ["EX4_ID", "EX4_S1"]:
+        files = sorted(glob(f"{folder}/**/*.JPEG", recursive=True))
+        # 259/259 [5:09:14<00:00, 71.64s/it]
+        for f in tqdm(files):
+            print(f)
+            if folder == "EX4_ID":
+                ruler_length = 31.797
+            else:
+                ruler_length = 41.371
+            df = measure_mussels_in_image(sam, f, plot=True, ruler_length=ruler_length)
+            os.makedirs("results/" + os.path.dirname(f), exist_ok=True)
+            df.to_csv("results/" + f + ".csv")
+            stats = df.length_cm.describe()
+            print(stats)
+            stats["filename"] = f
+            results.append(stats)
+            pd.DataFrame(results).to_csv("results.csv")
+            print(f"{round(time.time() - start)}s: {f} done")
+        print(f"{round(time.time() - start)}s: done")
