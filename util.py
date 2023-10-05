@@ -197,22 +197,22 @@ if __name__ == "__main__":
     print(f"{round(time.time() - start)}s: SAM loaded")
     #df = measure_mussels_in_image(sam, "test.png", plot=True, ruler_length=31.797)
     results = []
-    for folder in ["EX4_ID", "EX4_S1"]:
-        files = sorted(glob(f"{folder}/**/*.JPEG", recursive=True))
-        # 259/259 [5:09:14<00:00, 71.64s/it]
-        for f in tqdm(files):
-            print(f)
-            if folder == "EX4_ID":
-                ruler_length = 31.797
-            else:
-                ruler_length = 41.371
-            df = measure_mussels_in_image(sam, f, plot=True, ruler_length=ruler_length)
-            os.makedirs("results/" + os.path.dirname(f), exist_ok=True)
-            df.to_csv("results/" + f + ".csv")
-            stats = df.length_cm.describe()
-            print(stats)
-            stats["filename"] = f
-            results.append(stats)
-            pd.DataFrame(results).to_csv("results.csv")
-            print(f"{round(time.time() - start)}s: {f} done")
-        print(f"{round(time.time() - start)}s: done")
+    #files = sorted(glob(f"EX4*/**/*.JPEG", recursive=True))
+    files = sorted(glob(f"EX4_S1/PC_MORE_1/*.JPEG", recursive=True))
+    # 259/259 [5:09:14<00:00, 71.64s/it]
+    for f in tqdm(files):
+        print(f)
+        if f.startswith("EX4_ID") or f.startswith("EX4_S1/PC_MORE_1"):
+            ruler_length = 31.797
+        else:
+            ruler_length = 41.371
+        df = measure_mussels_in_image(sam, f, plot=True, ruler_length=ruler_length)
+        os.makedirs("results/" + os.path.dirname(f), exist_ok=True)
+        df.to_csv("results/" + f + ".csv")
+        stats = df.length_cm.describe()
+        print(stats)
+        stats["filename"] = f
+        results.append(stats)
+        pd.DataFrame(results).to_csv("results.csv")
+        print(f"{round(time.time() - start)}s: {f} done")
+    print(f"{round(time.time() - start)}s: done")
