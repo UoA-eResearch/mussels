@@ -197,8 +197,7 @@ if __name__ == "__main__":
     print(f"{round(time.time() - start)}s: SAM loaded")
     #df = measure_mussels_in_image(sam, "test.png", plot=True, ruler_length=31.797)
     results = []
-    #files = sorted(glob(f"EX4*/**/*.JPEG", recursive=True))
-    files = sorted(glob(f"EX4_S1/PC_MORE_1/*.JPEG", recursive=True))
+    files = sorted(glob(f"EX4*/**/*.JPEG", recursive=True))
     # 259/259 [5:09:14<00:00, 71.64s/it]
     for f in tqdm(files):
         print(f)
