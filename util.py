@@ -204,7 +204,7 @@ if __name__ == "__main__":
         df = measure_mussels_in_image(sam, f, plot=True)
         os.makedirs("results/" + os.path.dirname(f), exist_ok=True)
         df.to_csv("results/" + f + ".csv")
-        stats = df.describe()
+        stats = df.length_cm.describe()
         print(stats)
         stats["filename"] = f
         results.append(stats)
