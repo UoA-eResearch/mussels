@@ -154,9 +154,10 @@ def annotate_length(row):
     )
 
 
-def measure_mussels_in_image(sam, filepath, plot=False, ruler_length=32):
+def measure_mussels_in_image(sam, filepath, plot=False, ruler_length=32, rectify=True, result_dir="results"):
     img = load_img(filepath)
-    img = rectify(sam, img)
+    if rectify:
+        img = rectify(sam, img)
     df = get_shapes(sam, img)
     ruler = find_ruler(df)
     px_per_cm = get_px_per_cm(ruler, ruler_length)
@@ -186,8 +187,8 @@ def measure_mussels_in_image(sam, filepath, plot=False, ruler_length=32):
         for i, row in df.iterrows():
             annotate_length(row)
         plt.tight_layout()
-        os.makedirs("results/" + os.path.dirname(filepath), exist_ok=True)
-        plt.savefig("results/" + filepath + "_measured.png")
+        os.makedirs(os.path.join(result_dir, os.path.dirname(filepath)), exist_ok=True)
+        plt.savefig(os.path.join(result_dir, filepath + "_measured.png"))
     return df
 
 
@@ -198,6 +199,7 @@ if __name__ == "__main__":
     #df = measure_mussels_in_image(sam, "test.png", plot=True, ruler_length=31.797)
     results = []
     files = sorted(glob(f"EX4*/**/*.JPEG", recursive=True))
+    result_dir = "results/non-rectified/"
     # 259/259 [5:09:14<00:00, 71.64s/it]
     for f in tqdm(files):
         print(f)
@@ -205,13 +207,13 @@ if __name__ == "__main__":
             ruler_length = 31.797
         else:
             ruler_length = 41.371
-        df = measure_mussels_in_image(sam, f, plot=True, ruler_length=ruler_length)
-        os.makedirs("results/" + os.path.dirname(f), exist_ok=True)
-        df.to_csv("results/" + f + ".csv")
+        df = measure_mussels_in_image(sam, f, plot=True, ruler_length=ruler_length, rectify=False, result_dir=result_dir)
+        os.makedirs(os.path.join(result_dir, os.path.dirname(f)), exist_ok=True)
+        df.to_csv(os.path.join(result_dir, f + ".csv"))
         stats = df.length_cm.describe()
         print(stats)
         stats["filename"] = f
         results.append(stats)
-        pd.DataFrame(results).to_csv("results.csv")
+        pd.DataFrame(results).to_csv(os.path.join(result_dir, "results.csv"))
         print(f"{round(time.time() - start)}s: {f} done")
     print(f"{round(time.time() - start)}s: done")
