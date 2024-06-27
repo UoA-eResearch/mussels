@@ -58,7 +58,7 @@ def rectify(sam, img):
     ).generate(img)
     tray = max(masks, key=lambda x: x["area"])
     # Convert binary mask to polygon
-    tray = gpd.GeoSeries(shape(s) for s, v in shapes(tray["segmentation"].astype(np.uint8), mask=tray["segmentation"])).unary_union
+    tray = gpd.GeoSeries(shape(s) for s, v in shapes(tray["segmentation"].astype(np.uint8), mask=tray["segmentation"])).union_all()
     trapezoid = snap(tray.envelope.exterior, tray)
     bounds = trapezoid.envelope.exterior
     source_corners = np.float32(trapezoid.coords[:4])
@@ -154,12 +154,15 @@ def annotate_length(row):
     )
 
 
-def measure_mussels_in_image(sam, filepath, plot=False, ruler_length=32, rectify=True, result_dir="results"):
+def measure_mussels_in_image(sam, filepath, plot=False, ruler_length=32, run_rectify=False, tray_filter=True, result_dir="results"):
     img = load_img(filepath)
-    if rectify:
+    if run_rectify:
         img = rectify(sam, img)
     df = get_shapes(sam, img)
     ruler = find_ruler(df)
+    if ruler is None:
+        print(f"No ruler found in {filepath}")
+        return
     px_per_cm = get_px_per_cm(ruler, ruler_length)
 
     # Filter to inner part of tray
@@ -168,7 +171,10 @@ def measure_mussels_in_image(sam, filepath, plot=False, ruler_length=32, rectify
     tray_edge_buffer = height * .03
     area_threshold = height * .5
     tray_inner = tray.geometry.convex_hull.buffer(-tray_edge_buffer)
-    df = df[df.within(tray_inner) & (df.area > area_threshold)]
+    df = df[df.area > area_threshold]
+    
+    if tray_filter:
+        df = df[df.within(tray_inner)]
 
     df["diameter_line"] = df.geometry.apply(get_diameter)
     df["length_cm"] = df.diameter_line.length / px_per_cm
@@ -198,22 +204,24 @@ if __name__ == "__main__":
     print(f"{round(time.time() - start)}s: SAM loaded")
     #df = measure_mussels_in_image(sam, "test.png", plot=True, ruler_length=31.797)
     results = []
-    files = sorted(glob(f"EX4*/**/*.JPEG", recursive=True))
-    result_dir = "results/non-rectified/"
+    #files = sorted(glob(f"EX4*/**/*.JPEG", recursive=True))
+    files = sorted(glob(f"FISH_CAMERA_S3/*.jpg", recursive=True))
+    result_dir = 'Machine Learning based Mussel Measurements/non-rectified'
     # 259/259 [5:09:14<00:00, 71.64s/it]
     for f in tqdm(files):
         print(f)
-        if f.startswith("EX4_ID") or f.startswith("EX4_S1/PC_MORE_1"):
+        if f.startswith("EX4_ID") or f.startswith("EX4_S1/PC_MORE_1") or f.startswith('EX4_S2/C_LESS_1/') or f.startswith("FISH_CAMERA_S3"):
             ruler_length = 31.797
         else:
             ruler_length = 41.371
-        df = measure_mussels_in_image(sam, f, plot=True, ruler_length=ruler_length, rectify=False, result_dir=result_dir)
-        os.makedirs(os.path.join(result_dir, os.path.dirname(f)), exist_ok=True)
-        df.to_csv(os.path.join(result_dir, f + ".csv"))
-        stats = df.length_cm.describe()
-        print(stats)
-        stats["filename"] = f
-        results.append(stats)
-        pd.DataFrame(results).to_csv(os.path.join(result_dir, "results.csv"))
-        print(f"{round(time.time() - start)}s: {f} done")
+        df = measure_mussels_in_image(sam, f, plot=True, ruler_length=ruler_length, run_rectify=False, tray_filter=False, result_dir=result_dir)
+        if df is not None:
+            os.makedirs(os.path.join(result_dir, os.path.dirname(f)), exist_ok=True)
+            df.to_csv(os.path.join(result_dir, f + ".csv"))
+            stats = df.length_cm.describe()
+            print(stats)
+            stats["filename"] = f
+            results.append(stats)
+            pd.DataFrame(results).to_csv(os.path.join(result_dir, "results.csv"))
+            print(f"{round(time.time() - start)}s: {f} done")
     print(f"{round(time.time() - start)}s: done")
