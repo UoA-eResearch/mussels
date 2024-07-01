@@ -4,7 +4,7 @@ from glob import glob
 import pandas as pd
 from tqdm.auto import tqdm
 
-files = glob("results/**/*.csv", recursive=True)
+files = glob("*/**/*.csv", recursive=True)
 print(len(files))
 
 results = []

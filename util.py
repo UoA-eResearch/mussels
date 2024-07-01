@@ -200,28 +200,25 @@ def measure_mussels_in_image(sam, filepath, plot=False, ruler_length=32, run_rec
 
 if __name__ == "__main__":
     start = time.time()
+    result_dir = 'results'
+    ruler_lengths = pd.read_csv("ruler_lengths.csv")
+    # These ones are already done correctly
+    ruler_lengths = ruler_lengths[~ruler_lengths.folder.isin(["EX4_ID", "EX4_S1/PC_MORE_1", 'EX4_S2/C_LESS_1', "FISH_CAMERA_S3"])]
+    dfs = []
+    for row in ruler_lengths.itertuples(index=False):
+        dfs.append(pd.DataFrame({
+            "file": glob(f"{row.folder}/**/*.*", recursive=True),
+            "ruler_length": row.ruler_length + 1.5
+        }))
+    files = pd.concat(dfs)
     sam = load_SAM()
     print(f"{round(time.time() - start)}s: SAM loaded")
-    #df = measure_mussels_in_image(sam, "test.png", plot=True, ruler_length=31.797)
-    results = []
-    #files = sorted(glob(f"EX4*/**/*.JPEG", recursive=True))
-    files = sorted(glob(f"FISH_CAMERA_S3/*.jpg", recursive=True))
-    result_dir = 'Machine Learning based Mussel Measurements/non-rectified'
-    # 259/259 [5:09:14<00:00, 71.64s/it]
-    for f in tqdm(files):
-        print(f)
-        if f.startswith("EX4_ID") or f.startswith("EX4_S1/PC_MORE_1") or f.startswith('EX4_S2/C_LESS_1/') or f.startswith("FISH_CAMERA_S3"):
-            ruler_length = 31.797
-        else:
-            ruler_length = 41.371
+    for row in tqdm(files.itertuples(index=False), total=len(files)):
+        f = row.file
+        ruler_length = row.ruler_length
         df = measure_mussels_in_image(sam, f, plot=True, ruler_length=ruler_length, run_rectify=False, tray_filter=False, result_dir=result_dir)
         if df is not None:
             os.makedirs(os.path.join(result_dir, os.path.dirname(f)), exist_ok=True)
             df.to_csv(os.path.join(result_dir, f + ".csv"))
-            stats = df.length_cm.describe()
-            print(stats)
-            stats["filename"] = f
-            results.append(stats)
-            pd.DataFrame(results).to_csv(os.path.join(result_dir, "results.csv"))
-            print(f"{round(time.time() - start)}s: {f} done")
+        print(f"{round(time.time() - start)}s: {f} done")
     print(f"{round(time.time() - start)}s: done")
